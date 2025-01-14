@@ -42,6 +42,7 @@ public class VisionIOPhotonVision implements VisionIO {
 
   @Override
   public void updateInputs(VisionIOInputs inputs) {
+    
     inputs.connected = camera.isConnected();
 
     // Read new camera observations
@@ -66,6 +67,8 @@ public class VisionIOPhotonVision implements VisionIO {
         Transform3d fieldToCamera = multitagResult.estimatedPose.best;
         Transform3d fieldToRobot = fieldToCamera.plus(robotToCamera.inverse());
         Pose3d robotPose = new Pose3d(fieldToRobot.getTranslation(), fieldToRobot.getRotation());
+
+        System.out.println(robotPose);
 
         // Calculate average tag distance
         double totalTagDistance = 0.0;
@@ -118,6 +121,8 @@ public class VisionIOPhotonVision implements VisionIO {
     // Save pose observations to inputs object
     inputs.poseObservations = new PoseObservation[poseObservations.size()];
     for (int i = 0; i < poseObservations.size(); i++) {
+      System.out.println(camera.getName() + ":" + poseObservations.get(i).pose().getX() + "," + 
+        poseObservations.get(i).pose().getY());
       inputs.poseObservations[i] = poseObservations.get(i);
     }
 

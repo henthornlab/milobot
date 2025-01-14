@@ -1,6 +1,6 @@
 ## Welcome to MiloBot!
 
-![](./milobot.jpg)
+![Cartoon image of a black cat](./milobot.jpg)
 
 Simulation bot for tuning PhotonVision and Limelight using Advantagekit.
 
