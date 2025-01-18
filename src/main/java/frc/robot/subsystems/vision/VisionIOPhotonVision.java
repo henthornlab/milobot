@@ -42,15 +42,17 @@ public class VisionIOPhotonVision implements VisionIO {
 
   @Override
   public void updateInputs(VisionIOInputs inputs) {
-    
+
     inputs.connected = camera.isConnected();
 
     // Read new camera observations
     Set<Short> tagIds = new HashSet<>();
     List<PoseObservation> poseObservations = new LinkedList<>();
+
     for (var result : camera.getAllUnreadResults()) {
       // Update latest target observation
       if (result.hasTargets()) {
+        
         inputs.latestTargetObservation =
             new TargetObservation(
                 Rotation2d.fromDegrees(result.getBestTarget().getYaw()),
@@ -68,13 +70,14 @@ public class VisionIOPhotonVision implements VisionIO {
         Transform3d fieldToRobot = fieldToCamera.plus(robotToCamera.inverse());
         Pose3d robotPose = new Pose3d(fieldToRobot.getTranslation(), fieldToRobot.getRotation());
 
-        System.out.println(robotPose);
 
         // Calculate average tag distance
         double totalTagDistance = 0.0;
         for (var target : result.targets) {
           totalTagDistance += target.bestCameraToTarget.getTranslation().getNorm();
         }
+
+        System.out.println("Distance is " + totalTagDistance / result.targets.size());
 
         // Add tag IDs
         tagIds.addAll(multitagResult.fiducialIDsUsed);
@@ -94,13 +97,19 @@ public class VisionIOPhotonVision implements VisionIO {
 
         // Calculate robot pose
         var tagPose = aprilTagLayout.getTagPose(target.fiducialId);
+        System.out.println("tagPose:" + tagPose);
         if (tagPose.isPresent()) {
           Transform3d fieldToTarget =
               new Transform3d(tagPose.get().getTranslation(), tagPose.get().getRotation());
+          System.out.println("fieldToTarget:" + fieldToTarget);
           Transform3d cameraToTarget = target.bestCameraToTarget;
+          System.out.println("cameraToTarget:" + cameraToTarget);
           Transform3d fieldToCamera = fieldToTarget.plus(cameraToTarget.inverse());
+          System.out.println("fieldToCamera:" + fieldToCamera);
           Transform3d fieldToRobot = fieldToCamera.plus(robotToCamera.inverse());
+          System.out.println("fieldToRobot:" + fieldToRobot);
           Pose3d robotPose = new Pose3d(fieldToRobot.getTranslation(), fieldToRobot.getRotation());
+          System.out.println("robotPose:" + robotPose);
 
           // Add tag ID
           tagIds.add((short) target.fiducialId);
@@ -121,8 +130,6 @@ public class VisionIOPhotonVision implements VisionIO {
     // Save pose observations to inputs object
     inputs.poseObservations = new PoseObservation[poseObservations.size()];
     for (int i = 0; i < poseObservations.size(); i++) {
-      System.out.println(camera.getName() + ":" + poseObservations.get(i).pose().getX() + "," + 
-        poseObservations.get(i).pose().getY());
       inputs.poseObservations[i] = poseObservations.get(i);
     }
 
