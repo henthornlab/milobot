@@ -82,7 +82,7 @@ public class DemoDrive extends SubsystemBase {
       Pose2d visionRobotPoseMeters,
       double timestampSeconds,
       Matrix<N3, N1> visionMeasurementStdDevs) {
-        System.out.print("Adding vision measurement: " + visionRobotPoseMeters);
+        //System.out.print("Adding vision measurement");
     poseEstimator.addVisionMeasurement(
         visionRobotPoseMeters, timestampSeconds, visionMeasurementStdDevs);
   }

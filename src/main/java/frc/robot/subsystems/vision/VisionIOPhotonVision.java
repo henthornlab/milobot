@@ -23,6 +23,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import org.photonvision.PhotonCamera;
+import org.photonvision.PhotonPoseEstimator;
+import org.photonvision.PhotonPoseEstimator.PoseStrategy;
 
 /** IO implementation for real PhotonVision hardware. */
 public class VisionIOPhotonVision implements VisionIO {
@@ -77,8 +79,6 @@ public class VisionIOPhotonVision implements VisionIO {
           totalTagDistance += target.bestCameraToTarget.getTranslation().getNorm();
         }
 
-        System.out.println("Distance is " + totalTagDistance / result.targets.size());
-
         // Add tag IDs
         tagIds.addAll(multitagResult.fiducialIDsUsed);
 
@@ -97,19 +97,20 @@ public class VisionIOPhotonVision implements VisionIO {
 
         // Calculate robot pose
         var tagPose = aprilTagLayout.getTagPose(target.fiducialId);
-        System.out.println("tagPose:" + tagPose);
+        //System.out.println("****** " + camera.getName() + " *********************************");
+        //System.out.println("tagPose:" + tagPose);
         if (tagPose.isPresent()) {
           Transform3d fieldToTarget =
               new Transform3d(tagPose.get().getTranslation(), tagPose.get().getRotation());
-          System.out.println("fieldToTarget:" + fieldToTarget);
+          //System.out.println("fieldToTarget:" + fieldToTarget);
           Transform3d cameraToTarget = target.bestCameraToTarget;
-          System.out.println("cameraToTarget:" + cameraToTarget);
+          //System.out.println("cameraToTarget:" + cameraToTarget);
           Transform3d fieldToCamera = fieldToTarget.plus(cameraToTarget.inverse());
-          System.out.println("fieldToCamera:" + fieldToCamera);
+          //System.out.println("fieldToCamera:" + fieldToCamera);
           Transform3d fieldToRobot = fieldToCamera.plus(robotToCamera.inverse());
-          System.out.println("fieldToRobot:" + fieldToRobot);
+          //System.out.println("fieldToRobot:" + fieldToRobot);
           Pose3d robotPose = new Pose3d(fieldToRobot.getTranslation(), fieldToRobot.getRotation());
-          System.out.println("robotPose:" + robotPose);
+          //System.out.println("robotPose:" + robotPose);
 
           // Add tag ID
           tagIds.add((short) target.fiducialId);
