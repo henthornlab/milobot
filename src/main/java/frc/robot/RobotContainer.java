@@ -1,127 +1,137 @@
-// Copyright 2021-2025 FRC 6328
-// http://github.com/Mechanical-Advantage
-//
-// This program is free software; you can redistribute it and/or
-// modify it under the terms of the GNU General Public License
-// version 3 as published by the Free Software Foundation or
-// available in the root directory of this project.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
+// Copyright (c) FIRST and other WPILib contributors.
+// Open Source Software; you can modify and/or share it under the terms of
+// the WPILib BSD license file in the root directory of this project.
 
 package frc.robot;
 
-import static frc.robot.subsystems.vision.VisionConstants.*;
+import static edu.wpi.first.units.Units.*;
 
-import edu.wpi.first.math.controller.PIDController;
+import com.ctre.phoenix6.swerve.SwerveModule.DriveRequestType;
+import com.pathplanner.lib.auto.NamedCommands;
+import com.ctre.phoenix6.swerve.SwerveRequest;
+
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.GenericHID;
-import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
-import edu.wpi.first.wpilibj2.command.button.CommandGenericHID;
-import frc.robot.subsystems.drive.DemoDrive;
+import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
+import edu.wpi.first.wpilibj2.command.button.JoystickButton;
+import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Direction;
+import frc.robot.subsystems.arm.Arm;
+import frc.robot.subsystems.arm.ArmCommands;
+import frc.robot.subsystems.arm.io.RealArmIO;
+import frc.robot.subsystems.drive.CommandSwerveDrivetrain;
+import frc.robot.subsystems.drive.Telemetry;
+import frc.robot.subsystems.drive.TunerConstants;
+import frc.robot.subsystems.elevator.Elevator;
+import frc.robot.subsystems.elevator.ElevatorCommands;
+import frc.robot.subsystems.elevator.io.RealElevatorIO;
+import frc.robot.subsystems.multisubsystemcommands.MultiSubsystemCommands;
+import frc.robot.subsystems.multisubsystemcommands.MultiSubsystemCommands.OverallPosition;
 import frc.robot.subsystems.vision.Vision;
 import frc.robot.subsystems.vision.VisionIO;
 import frc.robot.subsystems.vision.VisionIOLimelight;
 import frc.robot.subsystems.vision.VisionIOPhotonVision;
 import frc.robot.subsystems.vision.VisionIOPhotonVisionSim;
+import static frc.robot.subsystems.vision.VisionConstants.*;
 
-/**
- * This class is where the bulk of the robot should be declared. Since Command-based is a
- * "declarative" paradigm, very little robot logic should actually be handled in the {@link Robot}
- * periodic methods (other than the scheduler calls). Instead, the structure of the robot (including
- * subsystems, commands, and button mappings) should be declared here.
- */
 public class RobotContainer {
+  private final Elevator elevatorSubsystem = new Elevator(new RealElevatorIO());
+  private final Arm armSubsystem = new Arm(new RealArmIO());
+  private final ElevatorCommands elevatorCommands = new ElevatorCommands(elevatorSubsystem);
+  private final ArmCommands armCommands = new ArmCommands(armSubsystem);
   private final Vision vision;
 
-  private final DemoDrive drive = new DemoDrive(); // Demo drive subsystem, sim only
-  private final CommandGenericHID keyboard = new CommandGenericHID(0); // Keyboard 0 on port 0
+  private final MultiSubsystemCommands multiSubsystemCommands = new MultiSubsystemCommands(elevatorSubsystem, armSubsystem, elevatorCommands, armCommands);
 
-  /** The container for the robot. Contains subsystems, OI devices, and commands. */
+  private double MaxSpeed = TunerConstants.kSpeedAt12Volts.in(MetersPerSecond); // kSpeedAt12Volts desired top speed
+  private double MaxAngularRate = RotationsPerSecond.of(0.75).in(RadiansPerSecond); // 3/4 of a rotation per second max
+                                                                                    // angular velocity
+
+  /* Setting up bindings for necessary control of the swerve drive platform */
+  private final SwerveRequest.FieldCentric drive = new SwerveRequest.FieldCentric()
+      .withDeadband(MaxSpeed * 0.1).withRotationalDeadband(MaxAngularRate * 0.1) // Add a 10% deadband
+      .withDriveRequestType(DriveRequestType.OpenLoopVoltage); // Use open-loop control for drive motors
+  private final SwerveRequest.SwerveDriveBrake brake = new SwerveRequest.SwerveDriveBrake();
+  private final SwerveRequest.PointWheelsAt point = new SwerveRequest.PointWheelsAt();
+
+  private final CommandXboxController joystick = new CommandXboxController(0);
+ 
+  private final GenericHID buttonbox1 = new GenericHID(1);
+  private final JoystickButton button1 = new JoystickButton(buttonbox1, 1);
+  private final JoystickButton button2 = new JoystickButton(buttonbox1, 2);
+  private final JoystickButton button3 = new JoystickButton(buttonbox1, 3);
+  private final JoystickButton button4 = new JoystickButton(buttonbox1, 4);
+  private final JoystickButton button5 = new JoystickButton(buttonbox1, 5);
+  private final JoystickButton button6 = new JoystickButton(buttonbox1, 6);
+  private final JoystickButton button7 = new JoystickButton(buttonbox1, 7);
+  private final JoystickButton button8 = new JoystickButton(buttonbox1, 8);
+  private final JoystickButton button9 = new JoystickButton(buttonbox1, 9);
+
+  public final CommandSwerveDrivetrain drivetrain = TunerConstants.createDrivetrain();
+
+  private final Telemetry logger = new Telemetry(MaxSpeed);
+
   public RobotContainer() {
-    switch (Constants.currentMode) {
-      case REAL:
-        // Real robot, instantiate hardware IO implementations
-        vision =
-            new Vision(
-                drive::addVisionMeasurement,
-                new VisionIOLimelight(camera0Name, drive::getRotation),
-                new VisionIOLimelight(camera1Name, drive::getRotation));
-        // vision =
-        //     new Vision(
-        //         demoDrive::addVisionMeasurement,
-        //         new VisionIOPhotonVision(camera0Name, robotToCamera0),
-        //         new VisionIOPhotonVision(camera1Name, robotToCamera1));
-        break;
-
-      case SIM:
-        // Sim robot, instantiate physics sim IO implementations
-        /* 
-        vision =
-            new Vision(
-                drive::addVisionMeasurement,
-                new VisionIOPhotonVisionSim(camera0Name, robotToCamera0, drive::getPose),
-                new VisionIOPhotonVisionSim(camera1Name, robotToCamera1, drive::getPose));
-                */
-        vision =
+    
+    
+ 
+    vision =
               new Vision(
-                drive::addVisionMeasurement,
+                drivetrain::addVisionMeasurement,
                 new VisionIOPhotonVision(camera0Name, robotToCamera0),
-                new VisionIOPhotonVision(camera1Name, robotToCamera1));
-        break;
+                new VisionIOPhotonVision(camera1Name, robotToCamera1)); 
+    
+    // All AutoAligns for reef will align to Left position
+    
+    // NamedCommands.getCommand("L1"); // AutoAlignToReef + ScoreL1
+    // NamedCommands.getCommand("L2"); // AutoAlignToReef + ScoreL2
+    // NamedCommands.getCommand("L3"); // AutoAlignToReef + ScoreL3
+    // NamedCommands.getCommand("L4"); // AutoAlignToReef + ScoreL4
 
-      default:
-        // Replayed robot, disable IO implementations
-        // (Use same number of dummy implementations as the real robot)
-        vision = new Vision(drive::addVisionMeasurement, new VisionIO() {}, new VisionIO() {});
-        break;
-    }
+    // NamedCommands.getCommand("Intake"); // AutoAlignToIntake + IntakeUntilHasPiece
 
-    // Configure the button bindings
-    configureButtonBindings();
+    configureBindings();
   }
 
-  /**
-   * Use this method to define your button->command mappings. Buttons can be created by
-   * instantiating a {@link GenericHID} or one of its subclasses ({@link
-   * edu.wpi.first.wpilibj.Joystick} or {@link XboxController}), and then passing it to a {@link
-   * edu.wpi.first.wpilibj2.command.button.JoystickButton}.
-   */
-  private void configureButtonBindings() {
-    // Joystick drive command
-    drive.setDefaultCommand(
-        Commands.run(
-            () -> {
-              drive.run(-keyboard.getRawAxis(1), -keyboard.getRawAxis(0));
-            },
-            drive));
+  private void configureBindings() {
+    // Note that X is defined as forward according to WPILib convention,
+    // and Y is defined as to the left according to WPILib convention.
+    drivetrain.setDefaultCommand(
+        // Drivetrain will execute this command periodically
+        drivetrain.applyRequest(() -> drive.withVelocityX(-joystick.getLeftY() * MaxSpeed) // Drive forward with
+                                                                                           // negative Y (forward)
+            .withVelocityY(-joystick.getLeftX() * MaxSpeed) // Drive left with negative X (left)
+            .withRotationalRate(-joystick.getRightX() * MaxAngularRate) // Drive counterclockwise with negative X (left)
+        ));
 
-    // Auto aim command example
-    @SuppressWarnings("resource")
-    PIDController aimController = new PIDController(0.2, 0.0, 0.0);
-    aimController.enableContinuousInput(-Math.PI, Math.PI);
-    keyboard
-        .button(1)
-        .whileTrue(
-            Commands.startRun(
-                () -> {
-                  aimController.reset();
-                },
-                () -> {
-                  drive.run(0.0, aimController.calculate(vision.getTargetX(0).getRadians()));
-                },
-                drive));
+    joystick.a().whileTrue(drivetrain.applyRequest(() -> brake));
+    joystick.b().whileTrue(drivetrain
+        .applyRequest(() -> point.withModuleDirection(new Rotation2d(-joystick.getLeftY(), -joystick.getLeftX()))));
+
+    // Run SysId routines when holding back/start and X/Y.
+    // Note that each routine should be run exactly once in a single log.
+    joystick.back().and(joystick.y()).whileTrue(drivetrain.sysIdDynamic(Direction.kForward));
+    joystick.back().and(joystick.x()).whileTrue(drivetrain.sysIdDynamic(Direction.kReverse));
+    joystick.start().and(joystick.y()).whileTrue(drivetrain.sysIdQuasistatic(Direction.kForward));
+    joystick.start().and(joystick.x()).whileTrue(drivetrain.sysIdQuasistatic(Direction.kReverse));
+
+    // reset the field-centric heading on left bumper press
+    joystick.leftBumper().onTrue(drivetrain.runOnce(() -> drivetrain.seedFieldCentric()));
+
+    drivetrain.registerTelemetry(logger::telemeterize);
+
+    button1.onTrue(multiSubsystemCommands.setOverallSetpoint(OverallPosition.L1));
+    button2.onTrue(multiSubsystemCommands.setOverallSetpoint(OverallPosition.L2));
+    button3.onTrue(multiSubsystemCommands.setOverallSetpoint(OverallPosition.Stow));
+    button4.onTrue(multiSubsystemCommands.setOverallSetpoint(OverallPosition.L3));
+    button5.onTrue(multiSubsystemCommands.setOverallSetpoint(OverallPosition.L4));
+    button6.onTrue(multiSubsystemCommands.setOverallSetpoint(OverallPosition.Loading));
+    button8.onTrue(multiSubsystemCommands.setOverallSetpoint(OverallPosition.L4_Score));
+
   }
 
-  /**
-   * Use this to pass the autonomous command to the main {@link Robot} class.
-   *
-   * @return the command to run in autonomous
-   */
   public Command getAutonomousCommand() {
-    return Commands.none();
+    return Commands.print("No autonomous command configured");
   }
 }
