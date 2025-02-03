@@ -43,6 +43,7 @@ public class VisionIOPhotonVision implements VisionIO {
   }
 
   // NEW COMMENT
+  // SECTION 2
   @Override
   public void updateInputs(VisionIOInputs inputs) {
 
