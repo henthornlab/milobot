@@ -2,7 +2,7 @@
 
 ![Cartoon image of a black cat](./milobot.jpg)
 
-Simulation bot for tuning PhotonVision and Limelight using Advantagekit.
+Simulation bot for combining Photonvision, Advantagekit, and FRC 5188's code.
 
 Things to tweak before using:
 
